@@ -2,6 +2,7 @@
 #include <cmath>
 #include <eigen3/Eigen/Eigen>
 #include <eigen3/Eigen/src/Core/Matrix.h>
+#include <eigen3/Eigen/src/Eigenvalues/EigenSolver.h>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
@@ -9,6 +10,22 @@
 #include <random>
 #include <sys/types.h>
 #define g 9.81
+
+/**
+ * @class RandomVector
+ * @brief I took this directly from ujwol. Don't know how it works.
+ *
+ */
+Eigen::Matrix<double, 4, 1> Random_vector(Eigen::Matrix<double, 4, 4> A) {
+  unsigned seed = std::chrono::system_clock::now().time_since_epoch().count();
+  std::default_random_engine generator(seed);
+  std::normal_distribution<double> distribution(0.0, 1.0);
+
+  Eigen::Matrix<double, 4, 1> R;
+
+	R << distribution(generator),distribution(generator),distribution(generator),distribution(generator);
+  return A * R;
+}
 
 class Projectile {
 public:
@@ -31,57 +48,8 @@ public:
     time++;
 
     x = vx * period + x;
-    y = vy * period - (1 / 2.0) * g * period * period;
+    y = y + vy * period - (1 / 2.0) * g * period * period;
     vy = vy - g * period;
-  }
-};
-
-/**
- * @class RandomVector
- * @brief I took this directly from ujwol. Don't know how it works.
- *
- */
-class RandomVector {
-public:
-  float m1_, m2_, v1_, c12_, v2_;
-
-  RandomVector(float m1, float m2, float v1, float c12, float v2) {
-    m1_ = m1;
-    m2_ = m2;
-    v1_ = v1;
-    v2_ = v2;
-    c12_ = c12;
-  }
-
-  float l11, l22, l12;
-
-  float x, y;
-
-  void set_vector() {
-    // Cholesky Decompositinn
-    l11 = sqrt(v1_);
-    l12 = c12_ / l11;
-
-    if (v2_ - l12 * l12 < 0)
-      throw -1;
-
-    l22 = sqrt(v2_ - l12 * l12);
-
-    float z1, z2;
-
-    // Define random generator with Gaussian distribution
-    unsigned seed = std::chrono::system_clock::now().time_since_epoch().count();
-    std::default_random_engine generator(seed);
-    std::normal_distribution<double> dist(0.0, 1.0);
-
-    z1 = dist(generator);
-    z2 = dist(generator);
-
-    x = l11 * z1;
-    y = l12 * z1 + l22 * z2;
-
-    x += m1_;
-    y += m2_;
   }
 };
 
@@ -96,20 +64,19 @@ public:
   Sensor(double x_, double y_, double vx_, double vy_)
       : x(x_), y(y_), vx(vx_), vy(vy_) {}
 
-  // TODO: change this thing later. The random matrix generator needs to be
-  // changed
-
-  /**
-   * @brief to change later
-   *
-   * @param p
-   */
   void update_sensor_data(const Projectile &p) {
-    RandomVector r(0, 0, 0.09, 0.01, 0.3);
-    r.set_vector();
+    Eigen::Matrix<double, 4, 4> cov; // covarience of sensor noise
+    cov << 
+				0.4, 0.5, 0.6, 0.9,
+				0.5, 0.6, 0.7, 0.6, 
+				0.4, 0.3, 0.4, 0.6,
+				0.7, 0.6, 0.9, 0.5;
 
-    x = p.x + r.x;
-    y = p.y + r.y;
+    Eigen::Matrix<double, 4, 1> noise = Random_vector(cov);
+    x = p.x + noise(0, 0);
+    y = p.y + noise(1, 0);
+    vx = p.vx + noise(2, 0);
+    vy = p.vy + noise(3, 0);
   }
 };
 
@@ -131,20 +98,24 @@ public:
 
   double period = 0.1;
   KalmanFilter() {
-    state << 0.5, 0.2;
+    state << 0,0,0,0;
 
     state_cov.setIdentity();
     measurement_cov.setIdentity();
 
     w.setZero();
-    v << 0.09, 0.01, 0.01, 0.3;
+		// v.setIdentity();
+    v <<1.28, 1.22, 1.64, 1.47,
+			1.2,  1.18, 1.54, 1.53,
+			0.89, 0.86, 1.15, 1.08,
+			1.29, 1.28, 1.65, 1.78;
   }
 
   void update(Sensor s) {
     C.setIdentity();
 
     Eigen::Matrix<double, 4, 1> sensor;
-    sensor << s.x, s.y,s.vx,s.vy;
+    sensor << s.x, s.y, s.vx, s.vy;
 
     Eigen::Matrix<double, 4, 4> S = C * state_cov * C.transpose() + v;
 
@@ -162,7 +133,7 @@ public:
   void predict() {
     A << 1, 0, period, 0, 0, 1, 0, period, 0, 0, 1, 0, 0, 0, 0, 1;
     u << g;
-    B << 0, 0, 0, (-1 / 2.0f) * period * period;
+    B << 0, (-1 / 2.0f) * period * period, 0, -period;
 
     state = A * state + B * u;
 
@@ -175,12 +146,12 @@ std::ostream &operator<<(std::ostream &os, const Projectile p) {
 }
 
 std::ostream &operator<<(std::ostream &os, const Sensor s) {
-  return os << "\t" << s.x << "t" << s.y;
+  return os << "\t" << s.x << "\t" << s.y;
 }
 
 int main() {
-  Projectile P(0,0,10,10);
-  Sensor S(0,0,0,0);
+  Projectile P(0, 0, 10, 50);
+  Sensor S(0, 0, 5, 40);
   KalmanFilter K;
 
   std::ofstream fs("data.txt", std::ios::out);
@@ -192,6 +163,7 @@ int main() {
     fs << S;
     K.update(S);
     fs << "\t" << K.state(0, 0);
+		fs << "\t" << K.state(1, 0);
     fs << "\n";
   }
   return 0;
