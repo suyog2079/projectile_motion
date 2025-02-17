@@ -67,11 +67,16 @@ public:
   void update_sensor_data(const Projectile &p) {
     Eigen::Matrix<double, 4, 4> cov; // covarience of sensor noise
     cov << 
-				0.4, 0.5, 0.6, 0.9,
-				0.5, 0.6, 0.7, 0.6, 
-				0.4, 0.3, 0.4, 0.6,
-				0.7, 0.6, 0.9, 0.5;
+		0.9, 0.5, 0.6, 0.9,
+		0.5, 0.6, 0.7, 0.6, 
+		0.4, 0.3, 0.4, 0.6,
+		0.7, 0.6, 0.9, 0.5;
 
+		// cov << 
+		// 1.93, 1.47, 1.94, 1.92,
+		// 1.45, 1.18, 1.54, 1.53,
+		// 1.09, 0.86, 1.15, 1.08,
+		// 1.64, 1.28, 1.65, 1.78 ;
     Eigen::Matrix<double, 4, 1> noise = Random_vector(cov);
     x = p.x + noise(0, 0);
     y = p.y + noise(1, 0);
@@ -93,22 +98,28 @@ public:
   Eigen::Matrix<double, 4, 1> measurement;
   Eigen::Matrix<double, 4, 4> measurement_cov;
 
-  Eigen::Matrix<double, 4, 4> v; // this is the sensor noise
-  Eigen::Matrix<double, 4, 4> w; // process noise
+  Eigen::Matrix<double, 4, 4> v; // this is the sensor noise covarience
+  Eigen::Matrix<double, 4, 4> w; // process noise covarience
 
   double period = 0.1;
   KalmanFilter() {
     state << 0,0,0,0;
 
     state_cov.setIdentity();
-    measurement_cov.setIdentity();
+    // measurement_cov.setIdentity();
+    measurement_cov  << 
+			1.93, 1.47, 1.94, 1.92,
+			1.45, 1.18, 1.54, 1.53,
+			1.09, 0.86, 1.15, 1.08,
+			1.64, 1.28, 1.65, 1.78;
 
     w.setZero();
-		// v.setIdentity();
-    v <<1.28, 1.22, 1.64, 1.47,
-			1.2,  1.18, 1.54, 1.53,
-			0.89, 0.86, 1.15, 1.08,
-			1.29, 1.28, 1.65, 1.78;
+		v.setIdentity();
+		// v << 
+		// 	1.93, 1.47, 1.94, 1.92,
+		// 	1.45, 1.18, 1.54, 1.53,
+		// 	1.09, 0.86, 1.15, 1.08,
+		// 	1.64, 1.28, 1.65, 1.78;
   }
 
   void update(Sensor s) {
@@ -151,7 +162,7 @@ std::ostream &operator<<(std::ostream &os, const Sensor s) {
 
 int main() {
   Projectile P(0, 0, 10, 50);
-  Sensor S(0, 0, 5, 40);
+  Sensor S(0, 0, 0, 0);
   KalmanFilter K;
 
   std::ofstream fs("data.txt", std::ios::out);
@@ -165,6 +176,10 @@ int main() {
     fs << "\t" << K.state(0, 0);
 		fs << "\t" << K.state(1, 0);
     fs << "\n";
+
+		std::cout << "====================================================state covarience===============================================================\n";
+		std::cout << K.state_cov;
+		std::cout << "\n";
   }
   return 0;
 }
