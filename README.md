@@ -46,7 +46,7 @@ x \\
 y \\
 v_x \\
 v_y
-\end{bmatrix}_{k+1}
+\end{bmatrix}
 = \begin{bmatrix}
 1 & 0 &  t & 0 \\
 0 & 1 &  0 & t\\
@@ -58,7 +58,7 @@ x \\
 y \\
 v_x \\
 v_y
-\end{bmatrix}_{k} + 
+\end{bmatrix} + 
 \begin{bmatrix}
 0  \\
 -\frac{1}{2}t^2 \\
@@ -76,7 +76,7 @@ $$Y = \begin{bmatrix}
 x \\
 y \\
 v_{x} \\
-v+y
+v_{y}
 \end{bmatrix}$$
 #### Measurement model matrix:
 $$C = \begin{bmatrix}
