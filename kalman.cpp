@@ -16,14 +16,15 @@
  * @brief I took this directly from ujwol. Don't know how it works.
  *
  */
-Eigen::Matrix<double, 4, 1> Random_vector(Eigen::Matrix<double, 4, 4> A) {
+Eigen::Matrix<double, 2, 1> Random_vector(Eigen::Matrix<double, 2, 2> A) {
   unsigned seed = std::chrono::system_clock::now().time_since_epoch().count();
   std::default_random_engine generator(seed);
   std::normal_distribution<double> distribution(0.0, 1.0);
 
-  Eigen::Matrix<double, 4, 1> R;
+  Eigen::Matrix<double, 2, 1> R;
 
-	R << distribution(generator),distribution(generator),distribution(generator),distribution(generator);
+	R << distribution(generator),distribution(generator);
+	// distribution(generator),distribution(generator);
   return A * R;
 }
 
@@ -65,41 +66,43 @@ public:
       : x(x_), y(y_), vx(vx_), vy(vy_) {}
 
   void update_sensor_data(const Projectile &p) {
-    Eigen::Matrix<double, 4, 4> cov; // covarience of sensor noise
+    Eigen::Matrix<double, 2, 2> cov; // covarience of sensor noise
     cov << 
-		0.9, 0.5, 0.6, 0.9,
-		0.5, 0.6, 0.7, 0.6, 
-		0.4, 0.3, 0.4, 0.6,
-		0.7, 0.6, 0.9, 0.5;
+		1.5,1.9,1.9,2.0;
+		// 0.5, 0.6, 0.7, 0.6, 
+		// 0.4, 0.3, 0.4, 0.6,
+		// 0.7, 0.6, 0.9, 0.5;
 
 		// cov << 
 		// 1.93, 1.47, 1.94, 1.92,
 		// 1.45, 1.18, 1.54, 1.53,
 		// 1.09, 0.86, 1.15, 1.08,
 		// 1.64, 1.28, 1.65, 1.78 ;
-    Eigen::Matrix<double, 4, 1> noise = Random_vector(cov);
+    Eigen::Matrix<double, 2, 1> noise = Random_vector(cov);
+
+		// std::cout << noise(0,0) << "\t" << noise(1,0) << "\n";
     x = p.x + noise(0, 0);
     y = p.y + noise(1, 0);
-    vx = p.vx + noise(2, 0);
-    vy = p.vy + noise(3, 0);
+    // vx = p.vx + noise(2, 0);
+    // vy = p.vy + noise(3, 0);
   }
 };
 
 class KalmanFilter {
 public:
   Eigen::Matrix<double, 4, 4> A; // state transition matrix (model)
-  Eigen::Matrix<double, 4, 4> C; // measurement model matrix
+  Eigen::Matrix<double, 2, 4> C; // measurement model matrix
 
   Eigen::Matrix<double, 4, 1> B; // this is control input model
   Eigen::Matrix<double, 4, 1> state;
   Eigen::Matrix<double, 4, 4> state_cov;
   Eigen::Matrix<double, 1, 1> u;
 
-  Eigen::Matrix<double, 4, 1> measurement;
-  Eigen::Matrix<double, 4, 4> measurement_cov;
+  // Eigen::Matrix<double, 2, 1> measurement;
+  // Eigen::Matrix<double, 2, 2> measurement_cov;
 
-  Eigen::Matrix<double, 4, 4> v; // this is the sensor noise covarience
-  Eigen::Matrix<double, 4, 4> w; // process noise covarience
+  Eigen::Matrix<double, 2, 2> sensor_noise_covarience; // this is the sensor noise covarience
+  Eigen::Matrix<double, 4, 4> process_noise_covarience; // process noise covarience
 
   double period = 0.1;
   KalmanFilter() {
@@ -107,14 +110,14 @@ public:
 
     state_cov.setIdentity();
     // measurement_cov.setIdentity();
-    measurement_cov  << 
-			1.93, 1.47, 1.94, 1.92,
-			1.45, 1.18, 1.54, 1.53,
-			1.09, 0.86, 1.15, 1.08,
-			1.64, 1.28, 1.65, 1.78;
+   //  measurement_cov  << 
+			// 1.93, 1.47, 1.94, 1.92;
+			// 1.45, 1.18, 1.54, 1.53,
+			// 1.09, 0.86, 1.15, 1.08,
+			// 1.64, 1.28, 1.65, 1.78;
 
-    w.setZero();
-		v.setIdentity();
+    process_noise_covarience.setZero();
+		sensor_noise_covarience.setIdentity();
 		// v << 
 		// 	1.93, 1.47, 1.94, 1.92,
 		// 	1.45, 1.18, 1.54, 1.53,
@@ -123,14 +126,16 @@ public:
   }
 
   void update(Sensor s) {
-    C.setIdentity();
+    C << 1,0,0,0,
+			0,1,0,0;
 
-    Eigen::Matrix<double, 4, 1> sensor;
-    sensor << s.x, s.y, s.vx, s.vy;
+    Eigen::Matrix<double, 2, 1> sensor;
+    sensor << s.x, s.y;
+			// , s.vx, s.vy;
 
-    Eigen::Matrix<double, 4, 4> S = C * state_cov * C.transpose() + v;
+    Eigen::Matrix<double, 2, 2> S = C * state_cov * C.transpose() + sensor_noise_covarience;
 
-    Eigen::Matrix<double, 4, 4> kalman_gain =
+    Eigen::Matrix<double, 4, 2> kalman_gain =
         state_cov * C.transpose() * S.inverse();
 
     state = state + kalman_gain * (sensor - C * state);
@@ -148,7 +153,7 @@ public:
 
     state = A * state + B * u;
 
-    state_cov = A * state_cov * A.transpose() + w;
+    state_cov = A * state_cov * A.transpose() + process_noise_covarience;
   }
 };
 

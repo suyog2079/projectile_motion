@@ -74,15 +74,11 @@ $$Y_{k} = C_{k}X_{k}+v_{k}$$
 #### Measurement vector
 $$Y = \begin{bmatrix}
 x \\
-y \\
-v_{x} \\
-v_{y}
+y 
 \end{bmatrix}$$
 #### Measurement model matrix:
 $$C = \begin{bmatrix}
-1 & 0 & 0 & 0 \\
-0 & 1 & 0 & 0 \\
-0 & 0 & 1 & 0 \\
-0 & 0 & 0 & 1 \\
+1 & 0\\ 
+0 & 1 
 \end{bmatrix}$$
 
